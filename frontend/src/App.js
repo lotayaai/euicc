@@ -11,9 +11,14 @@ function App() {
   const [stats, setStats] = useState({});
   const [showProfileForm, setShowProfileForm] = useState(false);
   const [showCertForm, setShowCertForm] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingProfile, setEditingProfile] = useState(null);
   const [certPemData, setCertPemData] = useState('');
   const [parsedCert, setParsedCert] = useState(null);
+  const [importMethod, setImportMethod] = useState('text');
+  const [importText, setImportText] = useState('');
+  const [scannedProfiles, setScannedProfiles] = useState([]);
+  const [importResult, setImportResult] = useState(null);
 
   useEffect(() => {
     fetchData();
