@@ -183,7 +183,8 @@ def parse_certificate(data: dict):
 @app.post("/api/certificates")
 def create_certificate(certificate: Certificate):
     cert_dict = certificate.model_dump()
-    certificates_collection.insert_one(cert_dict)
+    result = certificates_collection.insert_one(cert_dict)
+    cert_dict.pop('_id', None)
     return cert_dict
 
 @app.delete("/api/certificates/{cert_id}")
