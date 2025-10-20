@@ -89,7 +89,8 @@ def create_profile(profile: Profile):
     existing = profiles_collection.find_one({"iccid": profile.iccid})
     if existing:
         raise HTTPException(status_code=400, detail="Profile with this ICCID already exists")
-    profiles_collection.insert_one(profile_dict)
+    result = profiles_collection.insert_one(profile_dict)
+    profile_dict.pop('_id', None)
     return profile_dict
 
 @app.put("/api/profiles/{profile_id}")
