@@ -213,6 +213,186 @@ def get_stats():
         "total_certificates": total_certificates
     }
 
+# Bulk import endpoints
+@app.post("/api/profiles/import/json")
+def import_profiles_json(data: dict):
+    """Import profiles from JSON array"""
+    try:
+        profiles_data = data.get("profiles", [])
+        imported = []
+        skipped = []
+        
+        for profile_data in profiles_data:
+            # Check if ICCID already exists
+            existing = profiles_collection.find_one({"iccid": profile_data.get("iccid")})
+            if existing:
+                skipped.append({"iccid": profile_data.get("iccid"), "reason": "Already exists"})
+                continue
+            
+            # Create profile with UUID
+            profile = Profile(**profile_data)
+            profile_dict = profile.model_dump()
+            result = profiles_collection.insert_one(profile_dict)
+            profile_dict.pop('_id', None)
+            imported.append(profile_dict)
+        
+        return {
+            "success": True,
+            "imported_count": len(imported),
+            "skipped_count": len(skipped),
+            "imported": imported,
+            "skipped": skipped
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error importing profiles: {str(e)}")
+
+@app.post("/api/profiles/import/csv")
+async def import_profiles_csv(file: UploadFile = File(...)):
+    """Import profiles from CSV file"""
+    try:
+        contents = await file.read()
+        decoded = contents.decode('utf-8')
+        csv_reader = csv.DictReader(io.StringIO(decoded))
+        
+        imported = []
+        skipped = []
+        
+        for row in csv_reader:
+            # Check if ICCID already exists
+            if not row.get('iccid'):
+                skipped.append({"row": row, "reason": "Missing ICCID"})
+                continue
+                
+            existing = profiles_collection.find_one({"iccid": row['iccid']})
+            if existing:
+                skipped.append({"iccid": row['iccid'], "reason": "Already exists"})
+                continue
+            
+            # Create profile
+            profile_data = {
+                "name": row.get('name', 'Imported Profile'),
+                "iccid": row['iccid'],
+                "imsi": row.get('imsi', None),
+                "ki": row.get('ki', None),
+                "opc": row.get('opc', None),
+                "standard": row.get('standard', 'SGP.22'),
+                "status": row.get('status', 'disabled')
+            }
+            
+            profile = Profile(**profile_data)
+            profile_dict = profile.model_dump()
+            result = profiles_collection.insert_one(profile_dict)
+            profile_dict.pop('_id', None)
+            imported.append(profile_dict)
+        
+        return {
+            "success": True,
+            "imported_count": len(imported),
+            "skipped_count": len(skipped),
+            "imported": imported,
+            "skipped": skipped
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error importing CSV: {str(e)}")
+
+@app.post("/api/profiles/scan")
+def scan_profiles_text(data: dict):
+    """Scan and parse profiles from text format"""
+    try:
+        text_data = data.get("text", "")
+        profiles = []
+        current_profile = {}
+        
+        lines = text_data.strip().split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            
+            if ':' in line:
+                key, value = line.split(':', 1)
+                key = key.strip().lower()
+                value = value.strip()
+                
+                # Map common fields
+                if key in ['name', 'profile name', 'profile_name']:
+                    current_profile['name'] = value
+                elif key in ['iccid', 'icc-id', 'icc_id']:
+                    current_profile['iccid'] = value
+                elif key in ['imsi']:
+                    current_profile['imsi'] = value
+                elif key in ['ki', 'key']:
+                    current_profile['ki'] = value
+                elif key in ['opc', 'op', 'operator code']:
+                    current_profile['opc'] = value
+                elif key in ['standard', 'spec', 'specification']:
+                    current_profile['standard'] = value
+                elif key in ['status', 'state']:
+                    current_profile['status'] = value
+            
+            # Check if we have minimum required data
+            if 'iccid' in current_profile and len(current_profile.get('iccid', '')) >= 19:
+                if current_profile not in profiles:
+                    profiles.append(current_profile.copy())
+                    current_profile = {}
+        
+        # Add last profile if exists
+        if 'iccid' in current_profile:
+            profiles.append(current_profile)
+        
+        return {
+            "success": True,
+            "profiles_found": len(profiles),
+            "profiles": profiles
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error scanning profiles: {str(e)}")
+
+@app.post("/api/profiles/import/text")
+def import_scanned_profiles(data: dict):
+    """Import scanned profiles after preview"""
+    try:
+        profiles_data = data.get("profiles", [])
+        imported = []
+        skipped = []
+        
+        for profile_data in profiles_data:
+            if not profile_data.get('iccid'):
+                skipped.append({"data": profile_data, "reason": "Missing ICCID"})
+                continue
+            
+            # Check if ICCID already exists
+            existing = profiles_collection.find_one({"iccid": profile_data['iccid']})
+            if existing:
+                skipped.append({"iccid": profile_data['iccid'], "reason": "Already exists"})
+                continue
+            
+            # Set defaults
+            if 'name' not in profile_data:
+                profile_data['name'] = f"Profile {profile_data['iccid'][:10]}"
+            if 'standard' not in profile_data:
+                profile_data['standard'] = 'SGP.22'
+            if 'status' not in profile_data:
+                profile_data['status'] = 'disabled'
+            
+            # Create profile
+            profile = Profile(**profile_data)
+            profile_dict = profile.model_dump()
+            result = profiles_collection.insert_one(profile_dict)
+            profile_dict.pop('_id', None)
+            imported.append(profile_dict)
+        
+        return {
+            "success": True,
+            "imported_count": len(imported),
+            "skipped_count": len(skipped),
+            "imported": imported,
+            "skipped": skipped
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error importing profiles: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
