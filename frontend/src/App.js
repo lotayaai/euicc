@@ -323,17 +323,190 @@ function App() {
           <div data-testid="profiles-view">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-gray-900">Profile Management</h2>
-              <button
-                onClick={() => {
-                  setShowProfileForm(true);
-                  setEditingProfile(null);
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                data-testid="create-profile-btn"
-              >
-                Create Profile
-              </button>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  data-testid="import-profiles-btn"
+                >
+                  Import / Scan Profiles
+                </button>
+                <button
+                  onClick={() => {
+                    setShowProfileForm(true);
+                    setEditingProfile(null);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  data-testid="create-profile-btn"
+                >
+                  Create Profile
+                </button>
+              </div>
             </div>
+
+            {/* Import Result Banner */}
+            {importResult && (
+              <div className={`mb-6 p-4 rounded-lg ${importResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-green-800">
+                      Import Complete: {importResult.imported_count} profiles imported
+                    </p>
+                    {importResult.skipped_count > 0 && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        {importResult.skipped_count} profiles skipped (already exist)
+                      </p>
+                    )}
+                  </div>
+                  <button onClick={() => setImportResult(null)} className="text-gray-500 hover:text-gray-700">
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Import Modal */}
+            {showImportModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                  <div className="p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Import / Scan eSIM Profiles</h3>
+                    
+                    {/* Import Method Selector */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Import Method</label>
+                      <div className="flex space-x-4">
+                        <button
+                          onClick={() => setImportMethod('text')}
+                          className={`px-4 py-2 rounded-lg ${importMethod === 'text' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                        >
+                          Text Scan
+                        </button>
+                        <button
+                          onClick={() => setImportMethod('json')}
+                          className={`px-4 py-2 rounded-lg ${importMethod === 'json' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                        >
+                          JSON File
+                        </button>
+                        <button
+                          onClick={() => setImportMethod('csv')}
+                          className={`px-4 py-2 rounded-lg ${importMethod === 'csv' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                        >
+                          CSV File
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Text Scan Method */}
+                    {importMethod === 'text' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Paste Profile Data (Format: key: value)
+                        </label>
+                        <textarea
+                          value={importText}
+                          onChange={(e) => setImportText(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                          rows="10"
+                          placeholder="Name: Profile 1&#10;ICCID: 89012345678901234567&#10;IMSI: 310123456789012&#10;Ki: 00112233445566778899AABBCCDDEEFF&#10;OPC: FFEEDDCCBBAA99887766554433221100&#10;Standard: SGP.22&#10;&#10;Name: Profile 2&#10;ICCID: 89445566778899001122&#10;..."
+                          data-testid="import-text-input"
+                        />
+                        <div className="flex space-x-3 mt-4">
+                          <button
+                            onClick={handleScanProfiles}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            data-testid="scan-profiles-btn"
+                          >
+                            Scan Profiles
+                          </button>
+                          {scannedProfiles.length > 0 && (
+                            <button
+                              onClick={handleImportScanned}
+                              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                              data-testid="import-scanned-btn"
+                            >
+                              Import {scannedProfiles.length} Profile(s)
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Scanned Profiles Preview */}
+                        {scannedProfiles.length > 0 && (
+                          <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <h4 className="text-sm font-semibold text-gray-900 mb-3">Scanned Profiles Preview</h4>
+                            <div className="space-y-3">
+                              {scannedProfiles.map((profile, idx) => (
+                                <div key={idx} className="p-3 bg-white rounded border border-gray-200 text-xs">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div><span className="font-medium">Name:</span> {profile.name || 'N/A'}</div>
+                                    <div><span className="font-medium">ICCID:</span> {profile.iccid}</div>
+                                    <div><span className="font-medium">IMSI:</span> {profile.imsi || 'N/A'}</div>
+                                    <div><span className="font-medium">Standard:</span> {profile.standard || 'SGP.22'}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* JSON File Method */}
+                    {importMethod === 'json' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Upload JSON File
+                        </label>
+                        <p className="text-xs text-gray-600 mb-3">
+                          Format: {"{"}"profiles": [{"{"}"name": "...", "iccid": "...", ...{"}"}]{"}"}
+                        </p>
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={(e) => handleFileImport(e, 'json')}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          data-testid="json-file-input"
+                        />
+                      </div>
+                    )}
+
+                    {/* CSV File Method */}
+                    {importMethod === 'csv' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Upload CSV File
+                        </label>
+                        <p className="text-xs text-gray-600 mb-3">
+                          Headers: name,iccid,imsi,ki,opc,standard,status
+                        </p>
+                        <input
+                          type="file"
+                          accept=".csv"
+                          onChange={(e) => handleFileImport(e, 'csv')}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          data-testid="csv-file-input"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex justify-end mt-6">
+                      <button
+                        onClick={() => {
+                          setShowImportModal(false);
+                          setImportText('');
+                          setScannedProfiles([]);
+                          setImportResult(null);
+                        }}
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                        data-testid="close-import-modal-btn"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Profile Form Modal */}
             {showProfileForm && (
