@@ -139,6 +139,62 @@ function App() {
     }
   };
 
+  const handleScanProfiles = async () => {
+    try {
+      const response = await axios.post(`${API_URL}/api/profiles/scan`, {
+        text: importText
+      });
+      setScannedProfiles(response.data.profiles);
+      setImportResult(null);
+    } catch (error) {
+      alert('Error scanning profiles: ' + error.response?.data?.detail);
+    }
+  };
+
+  const handleImportScanned = async () => {
+    try {
+      const response = await axios.post(`${API_URL}/api/profiles/import/text`, {
+        profiles: scannedProfiles
+      });
+      setImportResult(response.data);
+      fetchData();
+      setTimeout(() => {
+        setShowImportModal(false);
+        setImportText('');
+        setScannedProfiles([]);
+        setImportResult(null);
+      }, 3000);
+    } catch (error) {
+      alert('Error importing profiles: ' + error.response?.data?.detail);
+    }
+  };
+
+  const handleFileImport = async (e, type) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      if (type === 'json') {
+        const text = await file.text();
+        const jsonData = JSON.parse(text);
+        const response = await axios.post(`${API_URL}/api/profiles/import/json`, jsonData);
+        setImportResult(response.data);
+        fetchData();
+      } else if (type === 'csv') {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await axios.post(`${API_URL}/api/profiles/import/csv`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        setImportResult(response.data);
+        fetchData();
+      }
+      setTimeout(() => setImportResult(null), 5000);
+    } catch (error) {
+      alert('Error importing file: ' + error.response?.data?.detail);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
